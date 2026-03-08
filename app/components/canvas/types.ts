@@ -1,6 +1,20 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { EditorObject } from "../editor/types";
 
+export interface StructuredProductAnalysis {
+  productName: string;
+  brandName: string;
+  visibleText: string[];
+  logoDescription: string;
+  shape: string;
+  primaryColors: string[];
+  materials: string[];
+  sizeImpression: string;
+  category: string;
+  distinguishingFeatures: string;
+  visualDescription: string;
+}
+
 export type ImageNodeData = {
   imageUrl: string;
   label?: string;
@@ -30,6 +44,7 @@ export type CreativeDirectionNodeData = {
   autoEditBrief?: boolean;
   iterateFeedback?: string;
   isIterating?: boolean;
+  inspirationId?: string;
   sourceNodeId?: string;
   onDelete?: (nodeId: string) => void;
   onUpdateField?: (nodeId: string, field: string, value: string | string[]) => void;

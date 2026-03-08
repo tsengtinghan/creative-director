@@ -22,10 +22,13 @@ import { UserButton } from "@clerk/nextjs";
 import { ImageNode } from "./ImageNode";
 import { CreativeDirectionNode } from "./CreativeDirectionNode";
 import { UploadButton } from "./UploadButton";
+import { InspirationSidebar } from "./InspirationSidebar";
+import { InspirationPickerModal } from "./InspirationPickerModal";
 
 import { Editor } from "../editor";
 import { AgentOverlay } from "../agent/AgentOverlay";
-import type { ImageNode as ImageNodeType, CanvasNode, CanvasEdge } from "./types";
+import type { ImageNode as ImageNodeType, CanvasNode, CanvasEdge, StructuredProductAnalysis } from "./types";
+import type { Inspiration } from "./InspirationSidebar";
 import type { EditorObject } from "../editor/types";
 
 const nodeTypes: NodeTypes = {
@@ -63,7 +66,15 @@ export function Canvas() {
   const buildDirectionPrompts = useAction(api.agent.buildDirectionPrompts);
   const generateImage = useAction(api.generate.generateImage);
   const iterateDirectionAction = useAction(api.agent.iterateDirection);
+  const adaptInspirationPrompt = useAction(api.agent.adaptInspirationPrompt);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Inspiration picker modal state
+  const [inspirationPickerOpen, setInspirationPickerOpen] = useState(false);
+  const [pendingProductData, setPendingProductData] = useState<{
+    imageUrls: string[];
+    productAnalysis: StructuredProductAnalysis;
+  } | null>(null);
 
   // Undo/Redo history
   const [history, setHistory] = useState<Array<{ nodes: CanvasNode[]; edges: CanvasEdge[]; nodeCounter: number; projectName: string }>>([]);
@@ -813,6 +824,111 @@ export function Canvas() {
       });
   }, [nodeCounter, setNodes, analyzeProduct, generateThumbnail, buildDirectionPrompts]);
 
+  // Handle "Start from Inspiration" — store product data and open picker modal
+  const handleInspirationMode = useCallback((imageUrls: string[], productAnalysis: StructuredProductAnalysis) => {
+    setIsAgentOpen(false);
+    setPendingProductData({ imageUrls, productAnalysis });
+    setInspirationPickerOpen(true);
+  }, []);
+
+  // Handle batch picking inspirations from the modal
+  const handleInspirationBatchPick = useCallback((selections: Array<{ inspiration: Inspiration; note: string }>) => {
+    if (!pendingProductData || selections.length === 0) return;
+
+    const { imageUrls, productAnalysis } = pendingProductData;
+
+    // Close modal
+    setInspirationPickerOpen(false);
+    setPendingProductData(null);
+
+    // Position nodes spread horizontally
+    const viewport = reactFlowInstanceRef.current?.getViewport();
+    const centerX = viewport ? (-viewport.x + window.innerWidth / 2) / (viewport.zoom || 1) : 400;
+    const centerY = viewport ? (-viewport.y + window.innerHeight / 2) / (viewport.zoom || 1) : 300;
+    const count = selections.length;
+    const totalWidth = (count - 1) * 320;
+    const startX = centerX - totalWidth / 2;
+    const currentCounter = nodeCounter;
+
+    // Create loading placeholder nodes
+    const placeholderNodes: CanvasNode[] = selections.map((sel, i) => ({
+      id: `direction-${currentCounter + i}`,
+      type: "creative-direction" as const,
+      position: { x: startX + i * 320, y: centerY },
+      data: {
+        title: "Adapting...",
+        brief: "Adapting inspiration to your product...",
+        vibePrompt: "",
+        keywords: [],
+        isLoading: true,
+        inspirationId: sel.inspiration.id,
+        referenceImageUrls: imageUrls,
+      },
+    }));
+
+    setNodes(nds => [...nds, ...placeholderNodes]);
+    setNodeCounter(c => c + count);
+    setTimeout(() => reactFlowInstanceRef.current?.fitView({ duration: 500, padding: 0.2 }), 100);
+
+    // Fire adaptInspirationPrompt for each selection in parallel
+    selections.forEach((sel, i) => {
+      const nodeId = `direction-${currentCounter + i}`;
+
+      adaptInspirationPrompt({
+        templatePrompt: sel.inspiration.prompt,
+        userNote: sel.note || undefined,
+        productAnalysis,
+        imageUrls,
+      })
+        .then((result) => {
+          // Update node with adapted data
+          setNodes(nds => nds.map(node => {
+            if (node.id !== nodeId) return node;
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                title: result.title,
+                brief: result.brief,
+                vibePrompt: result.vibePrompt,
+                keywords: result.keywords.slice(0, 5),
+                isLoading: false,
+                vibeImageUrl: sel.inspiration.image,
+                productDescription: productAnalysis.visualDescription,
+                referenceImageUrls: imageUrls,
+              },
+            } as CanvasNode;
+          }));
+
+          // Build direction prompts
+          buildDirectionPrompts({
+            title: result.title,
+            brief: result.brief,
+            vibePrompt: result.vibePrompt,
+            keywords: result.keywords.slice(0, 5),
+            productDescription: productAnalysis.visualDescription,
+            referenceImageUrls: imageUrls,
+          })
+            .then(({ prompts }) => {
+              setNodes(nds => nds.map(node => {
+                if (node.id !== nodeId) return node;
+                return {
+                  ...node,
+                  data: { ...node.data, generationPrompts: prompts, promptsReady: true },
+                } as CanvasNode;
+              }));
+            })
+            .catch((err) => {
+              console.error(`Prompt building failed for adapted direction ${i}:`, err);
+            });
+        })
+        .catch((err) => {
+          console.error(`Adaptation failed for selection ${i}:`, err);
+          setNodes(nds => nds.filter(node => node.id !== nodeId));
+        });
+    });
+  }, [pendingProductData, nodeCounter, setNodes, adaptInspirationPrompt, buildDirectionPrompts]);
+
   // Inject onDelete callback into each node's data for rendering
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => {
@@ -980,6 +1096,9 @@ export function Canvas() {
         </div>
       </div>
 
+      {/* Inspiration sidebar (browse-only) */}
+      <InspirationSidebar />
+
       {/* User menu */}
       <div className="fixed right-6 top-6 z-30">
         <UserButton afterSignOutUrl="/" />
@@ -1072,6 +1191,14 @@ export function Canvas() {
         isOpen={isAgentOpen}
         onClose={() => setIsAgentOpen(false)}
         onSubmit={handleAgentSubmit}
+        onInspirationMode={handleInspirationMode}
+      />
+
+      <InspirationPickerModal
+        isOpen={inspirationPickerOpen}
+        onClose={() => { setInspirationPickerOpen(false); setPendingProductData(null); }}
+        productName={pendingProductData?.productAnalysis.productName ?? ""}
+        onSubmit={handleInspirationBatchPick}
       />
     </div>
   );

@@ -11,6 +11,7 @@
 import type * as agent from "../agent.js";
 import type * as canvas from "../canvas.js";
 import type * as generate from "../generate.js";
+import type * as products from "../products.js";
 import type * as users from "../users.js";
 
 import type {
@@ -23,6 +24,7 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   canvas: typeof canvas;
   generate: typeof generate;
+  products: typeof products;
   users: typeof users;
 }>;
 

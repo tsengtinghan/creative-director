@@ -232,6 +232,212 @@ RULES
 
 Also provide a productDescription: a precise visual description of the product (color, texture, logos, shape, materials, finish, size impression) detailed enough that someone who hasn't seen it could reconstruct its appearance in an image generation prompt. Focus on visual attributes only.`;
 
+const productAnalysisSchema = {
+  type: "object" as const,
+  properties: {
+    productName: { type: "string" as const },
+    brandName: { type: "string" as const },
+    visibleText: { type: "array" as const, items: { type: "string" as const } },
+    logoDescription: { type: "string" as const },
+    shape: { type: "string" as const },
+    primaryColors: { type: "array" as const, items: { type: "string" as const } },
+    materials: { type: "array" as const, items: { type: "string" as const } },
+    sizeImpression: { type: "string" as const },
+    category: { type: "string" as const },
+    distinguishingFeatures: { type: "string" as const },
+    visualDescription: { type: "string" as const },
+  },
+  required: [
+    "productName", "brandName", "visibleText", "logoDescription", "shape",
+    "primaryColors", "materials", "sizeImpression", "category",
+    "distinguishingFeatures", "visualDescription",
+  ],
+};
+
+const PRODUCT_ANALYSIS_PROMPT = `You are a product photographer's assistant cataloging a product for a shoot brief. Analyze the product image(s) carefully and extract:
+
+- productName: The full product name as it appears on the packaging
+- brandName: The brand name
+- visibleText: ALL readable text on the product (labels, ingredients lists, taglines, etc.)
+- logoDescription: Describe the logo (shape, colors, style)
+- shape: The 3D form of the product (e.g. "cylindrical jar with screw-top lid")
+- primaryColors: The dominant colors of the product and packaging
+- materials: What the product appears to be made of (e.g. "plastic", "glass", "matte finish")
+- sizeImpression: How big the product appears (e.g. "medium jar, fits in one hand")
+- category: Product category (e.g. "skincare", "electronics", "beverage")
+- distinguishingFeatures: What makes this product visually unique
+- visualDescription: A full paragraph description detailed enough that someone who hasn't seen the product could reconstruct its appearance in an image generation prompt. Focus on visual attributes only.
+
+Be precise and thorough. Read ALL text on the product.`;
+
+export const analyzeProductVisuals = action({
+  args: {
+    imageUrls: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const { GoogleGenAI } = await import("@google/genai");
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    if (!args.imageUrls || args.imageUrls.length === 0) {
+      throw new Error("At least one image is required");
+    }
+
+    const parts: Array<
+      { text: string } | { inlineData: { mimeType: string; data: string } }
+    > = [];
+
+    parts.push({ text: PRODUCT_ANALYSIS_PROMPT });
+
+    for (const imageUrl of args.imageUrls) {
+      let dataUrl = imageUrl;
+      if (!dataUrl.startsWith("data:")) {
+        dataUrl = await urlToDataUrl(dataUrl);
+      }
+      parts.push({
+        inlineData: {
+          mimeType: getMimeType(dataUrl),
+          data: stripDataUrlPrefix(dataUrl),
+        },
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: productAnalysisSchema,
+      },
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("No response from model");
+
+    return JSON.parse(text);
+  },
+});
+
+const adaptInspirationSchema = {
+  type: "object" as const,
+  properties: {
+    title: { type: "string" as const },
+    brief: { type: "string" as const },
+    vibePrompt: { type: "string" as const },
+    keywords: {
+      type: "array" as const,
+      items: { type: "string" as const },
+      maxItems: 5,
+    },
+  },
+  required: ["title", "brief", "vibePrompt", "keywords"],
+};
+
+export const adaptInspirationPrompt = action({
+  args: {
+    templatePrompt: v.string(),
+    userNote: v.optional(v.string()),
+    productAnalysis: v.object({
+      productName: v.string(),
+      brandName: v.string(),
+      visibleText: v.array(v.string()),
+      logoDescription: v.string(),
+      shape: v.string(),
+      primaryColors: v.array(v.string()),
+      materials: v.array(v.string()),
+      sizeImpression: v.string(),
+      category: v.string(),
+      distinguishingFeatures: v.string(),
+      visualDescription: v.string(),
+    }),
+    imageUrls: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const { GoogleGenAI } = await import("@google/genai");
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const parts: Array<
+      { text: string } | { inlineData: { mimeType: string; data: string } }
+    > = [];
+
+    parts.push({
+      text: `You are an elite creative director adapting an inspiration prompt for a specific product.
+
+TEMPLATE PROMPT (from inspiration gallery):
+"${args.templatePrompt}"
+
+USER'S PRODUCT DETAILS:
+- Product: ${args.productAnalysis.productName} by ${args.productAnalysis.brandName}
+- Shape: ${args.productAnalysis.shape}
+- Colors: ${args.productAnalysis.primaryColors.join(", ")}
+- Materials: ${args.productAnalysis.materials.join(", ")}
+- Text on product: ${args.productAnalysis.visibleText.join(", ")}
+- Logo: ${args.productAnalysis.logoDescription}
+- Size: ${args.productAnalysis.sizeImpression}
+- Category: ${args.productAnalysis.category}
+- Visual description: ${args.productAnalysis.visualDescription}
+
+YOUR TASK:
+1. Identify all product-specific details in the template prompt (product name, shape, material, color, text/labels, category-specific references)
+2. Replace them with the user's actual product details from the structured analysis above
+3. PRESERVE the creative direction: lighting, composition, mood, setting, camera angles, artistic style
+4. If the product category differs significantly (e.g. template is for a serum but user has earbuds), adapt environment/interaction references intelligently — keep the mood and aesthetic but adjust physical interactions to make sense
+5. The vibePrompt output IS the adapted full prompt — it should be dense enough for a photographer or AI image generator to execute directly
+${args.userNote ? `\nUSER INSTRUCTIONS (follow these closely — they override the default adaptation behavior):\n"${args.userNote}"\n` : ""}
+Return:
+- title: A 2-4 word evocative concept name that fits the adapted direction (not a category label)
+- brief: 2-3 sentences briefing a photographer, specific to the user's product in this creative direction
+- vibePrompt: The full adapted prompt with the user's product swapped in, preserving the template's creative direction
+- keywords: Up to 5 keywords`,
+    });
+
+    for (const imageUrl of args.imageUrls) {
+      let dataUrl = imageUrl;
+      if (!dataUrl.startsWith("data:")) {
+        dataUrl = await urlToDataUrl(dataUrl);
+      }
+      parts.push({
+        inlineData: {
+          mimeType: getMimeType(dataUrl),
+          data: stripDataUrlPrefix(dataUrl),
+        },
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: adaptInspirationSchema,
+      },
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("No response from model");
+
+    return JSON.parse(text) as {
+      title: string;
+      brief: string;
+      vibePrompt: string;
+      keywords: string[];
+    };
+  },
+});
+
 interface DirectionResult {
   title: string;
   brief: string;
@@ -287,7 +493,7 @@ export const analyzeProduct = action({
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts }],
       config: {
         responseMimeType: "application/json",
@@ -391,7 +597,7 @@ Notice: all 4 stay in the same world (breakfast table, morning light, the pour).
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts }],
       config: {
         responseMimeType: "application/json",
@@ -491,7 +697,7 @@ Be specific and bold. Don't hedge or water down the direction — commit to the 
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts }],
       config: {
         responseMimeType: "application/json",

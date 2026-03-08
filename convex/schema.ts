@@ -16,4 +16,13 @@ export default defineSchema({
     nodeCounter: v.number(),
     projectName: v.string(),
   }).index("by_userId", ["userId"]),
+
+  products: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    imageUrls: v.array(v.string()),
+    thumbnailUrl: v.string(),
+    analysis: v.any(),
+    createdAt: v.number(),
+  }).index("by_userId", ["userId"]),
 });
