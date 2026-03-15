@@ -18,7 +18,7 @@ import "@xyflow/react/dist/style.css";
 
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useAuth } from "@clerk/nextjs";
 import { ImageNode } from "./ImageNode";
 import { CreativeDirectionNode } from "./CreativeDirectionNode";
 import { UploadButton } from "./UploadButton";
@@ -48,14 +48,15 @@ export function Canvas() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const reactFlowInstanceRef = useRef<ReactFlowInstance<any, CanvasEdge> | null>(null);
   
-  // Store user on first access
+  // Store user on first access (wait until Clerk auth is ready)
+  const { isSignedIn } = useAuth();
   const storeUser = useMutation(api.users.store);
   const storeUserCalled = useRef(false);
   useEffect(() => {
-    if (storeUserCalled.current) return;
+    if (!isSignedIn || storeUserCalled.current) return;
     storeUserCalled.current = true;
     storeUser().catch(console.error);
-  }, [storeUser]);
+  }, [isSignedIn, storeUser]);
 
   // Convex queries and mutations
   const savedState = useQuery(api.canvas.get);

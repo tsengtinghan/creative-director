@@ -10,8 +10,10 @@
 
 import type * as agent from "../agent.js";
 import type * as canvas from "../canvas.js";
+import type * as crons from "../crons.js";
 import type * as generate from "../generate.js";
 import type * as products from "../products.js";
+import type * as storage from "../storage.js";
 import type * as users from "../users.js";
 
 import type {
@@ -23,8 +25,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   canvas: typeof canvas;
+  crons: typeof crons;
   generate: typeof generate;
   products: typeof products;
+  storage: typeof storage;
   users: typeof users;
 }>;
 

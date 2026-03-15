@@ -257,16 +257,31 @@ export function InspirationSidebar() {
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 pt-5 pb-2">
                   <div>
-                    <span
-                      style={{
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        color: "#1a1a1a",
-                      }}
-                    >
-                      {selected.author_name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        style={{
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+                          fontSize: "14px",
+                          fontWeight: "600",
+                          color: "#1a1a1a",
+                        }}
+                      >
+                        {selected.author_name}
+                      </span>
+                      {selected.source_url && (
+                        <a
+                          href={selected.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                          title="View on X"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="#666">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-gray-400 mt-1" style={{ fontSize: "12px" }}>
                       <span className="flex items-center gap-1">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#ef4444" }}>
