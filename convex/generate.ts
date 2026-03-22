@@ -2,6 +2,7 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
+import { buildThumbnailPrompt } from "./prompts";
 
 // Helper to get image dimensions from base64 data
 function getImageDimensions(
@@ -261,15 +262,7 @@ export const generateThumbnail = action({
     > = [];
 
     parts.push({
-      text: `Generate a 2×2 image grid (4 panels arranged in two rows, two columns) that conveys the mood and aesthetic of this creative direction: ${args.vibePrompt}
-
-RULES:
-- The image must be a clean 2×2 grid with 4 distinct photos/visuals, each capturing a different facet of the vibe
-- DO NOT include any text, typography, logos, watermarks, or labels anywhere in the image
-- Each panel should be a different visual — vary the subject, angle, texture, or setting while keeping a cohesive color palette and mood
-- Think mood board: textures, lighting, environments, close-ups, abstract details — all reinforcing the same aesthetic
-- The overall image aspect ratio should be 16:10 (landscape, slightly wider than tall)
-- Keep it visually rich and evocative at small sizes — bold colors, strong compositions, clear subjects`,
+      text: buildThumbnailPrompt(args.vibePrompt),
     });
 
     // Add reference images for context

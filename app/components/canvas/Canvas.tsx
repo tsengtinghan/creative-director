@@ -36,6 +36,52 @@ const nodeTypes: NodeTypes = {
   "creative-direction": CreativeDirectionNode,
 };
 
+// Estimated node dimensions by type
+const NODE_SIZES: Record<string, { w: number; h: number }> = {
+  image: { w: 210, h: 230 },
+  "creative-direction": { w: 360, h: 480 },
+};
+
+/** Return a position near `desired` that doesn't overlap any existing node. */
+function findNonOverlappingPosition(
+  desired: { x: number; y: number },
+  nodeType: string,
+  existingNodes: CanvasNode[],
+  padding = 20,
+): { x: number; y: number } {
+  const size = NODE_SIZES[nodeType] ?? { w: 200, h: 200 };
+
+  const overlaps = (pos: { x: number; y: number }) =>
+    existingNodes.some((n) => {
+      const ns = NODE_SIZES[n.type ?? "image"] ?? { w: 200, h: 200 };
+      return (
+        pos.x < n.position.x + ns.w + padding &&
+        pos.x + size.w + padding > n.position.x &&
+        pos.y < n.position.y + ns.h + padding &&
+        pos.y + size.h + padding > n.position.y
+      );
+    });
+
+  if (!overlaps(desired)) return desired;
+
+  // Try shifting right, then down-right, in increasing offsets
+  for (let attempt = 1; attempt <= 20; attempt++) {
+    const offsetX = attempt * (size.w + padding);
+    // Try right
+    const right = { x: desired.x + offsetX, y: desired.y };
+    if (!overlaps(right)) return right;
+    // Try left
+    const left = { x: desired.x - offsetX, y: desired.y };
+    if (!overlaps(left)) return left;
+    // Try below
+    const below = { x: desired.x, y: desired.y + attempt * (size.h + padding) };
+    if (!overlaps(below)) return below;
+  }
+
+  // Fallback: just offset diagonally
+  return { x: desired.x + 60, y: desired.y + 60 };
+}
+
 export function Canvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<CanvasEdge>([]);
@@ -263,10 +309,12 @@ export function Canvas() {
       // Load image to get dimensions
       const img = new Image();
       img.onload = () => {
+        const desired = { x: 100 + nodeCounter * 50, y: 100 + nodeCounter * 50 };
+        const position = findNonOverlappingPosition(desired, "image", nodes);
         const newNode: ImageNodeType = {
           id: `image-${nodeCounter}`,
           type: "image",
-          position: { x: 100 + nodeCounter * 50, y: 100 + nodeCounter * 50 },
+          position,
           data: {
             imageUrl,
             label: `Image ${nodeCounter + 1}`,
@@ -279,7 +327,7 @@ export function Canvas() {
       };
       img.src = imageUrl;
     },
-    [nodeCounter, setNodes]
+    [nodeCounter, setNodes, nodes]
   );
 
   const handleCreateBlank = useCallback(() => {
@@ -340,13 +388,12 @@ export function Canvas() {
         } else {
           // Create new node for blank sketch - use composite image for new sketches
           const newNodeId = `image-${nodeCounter}`;
+          const desired = { x: 100 + nodeCounter * 50, y: 100 + nodeCounter * 50 };
+          const position = findNonOverlappingPosition(desired, "image", nodes);
           const newNode: ImageNodeType = {
             id: newNodeId,
             type: "image",
-            position: {
-              x: 100 + nodeCounter * 50,
-              y: 100 + nodeCounter * 50,
-            },
+            position,
             data: {
               imageUrl: compositeImage,
               label: `Sketch ${nodeCounter + 1}`,
@@ -361,7 +408,7 @@ export function Canvas() {
       };
       img.src = compositeImage;
     },
-    [editingNodeId, setNodes, nodeCounter]
+    [editingNodeId, setNodes, nodeCounter, nodes]
   );
 
   // Handle editor objects change - save back to node
@@ -431,15 +478,16 @@ export function Canvas() {
     const srcData = sourceNode.data as import("./types").CreativeDirectionNodeData;
 
     const newId = `direction-${nodeCounter}`;
+    const desiredPos = { x: sourceNode.position.x + 400, y: sourceNode.position.y };
+    const position = findNonOverlappingPosition(desiredPos, "creative-direction", nodes);
     const newNode: CanvasNode = {
       id: newId,
       type: "creative-direction" as const,
-      position: { x: sourceNode.position.x + 300, y: sourceNode.position.y },
+      position,
       data: {
         title: srcData.title,
         brief: srcData.brief,
         vibePrompt: srcData.vibePrompt,
-        keywords: [...srcData.keywords],
         vibeImageUrl: srcData.vibeImageUrl,
         productDescription: srcData.productDescription,
         referenceImageUrls: srcData.referenceImageUrls ? [...srcData.referenceImageUrls] : undefined,
@@ -484,7 +532,6 @@ export function Canvas() {
           title: "Iterating...",
           brief: feedback,
           vibeImageUrl: undefined,
-          keywords: [],
         },
       } as CanvasNode;
     }));
@@ -495,7 +542,6 @@ export function Canvas() {
         title: nodeData.title,
         brief: nodeData.brief,
         vibePrompt: nodeData.vibePrompt,
-        keywords: nodeData.keywords,
         productDescription: nodeData.productDescription || "",
         referenceImageUrls: nodeData.referenceImageUrls || [],
         feedback,
@@ -511,7 +557,6 @@ export function Canvas() {
             title: result.title,
             brief: result.brief,
             vibePrompt: result.vibePrompt,
-            keywords: result.keywords.slice(0, 5),
             isLoading: true,
             productDescription: nodeData.productDescription,
             referenceImageUrls: nodeData.referenceImageUrls,
@@ -548,7 +593,6 @@ export function Canvas() {
         title: result.title,
         brief: result.brief,
         vibePrompt: result.vibePrompt,
-        keywords: result.keywords.slice(0, 5),
         productDescription: nodeData.productDescription || "",
         referenceImageUrls: nodeData.referenceImageUrls || [],
       })
@@ -576,7 +620,6 @@ export function Canvas() {
             title: nodeData.title,
             brief: nodeData.brief,
             vibePrompt: nodeData.vibePrompt,
-            keywords: nodeData.keywords,
             vibeImageUrl: nodeData.vibeImageUrl,
             isLoading: false,
             isIterating: true,
@@ -610,7 +653,6 @@ export function Canvas() {
           title: dirData.title,
           brief: dirData.brief,
           vibePrompt: dirData.vibePrompt,
-          keywords: dirData.keywords,
           productDescription: dirData.productDescription || "",
           referenceImageUrls: dirData.referenceImageUrls || [],
         });
@@ -639,12 +681,20 @@ export function Canvas() {
     }
 
     // Create 4 placeholder image nodes in a 2×2 grid below the direction node
-    const nodeWidth = 256; // matches the direction node width
+    const nodeWidth = 340; // matches the direction node width
     const cellW = 220;
     const cellH = 220;
     const gridWidth = 2 * cellW;
-    const baseX = directionNode.position.x + (nodeWidth - gridWidth) / 2; // center grid under node
-    const baseY = directionNode.position.y + 320; // below the direction node
+    const desiredBaseX = directionNode.position.x + (nodeWidth - gridWidth) / 2;
+    const desiredBaseY = directionNode.position.y + 500; // below the direction node
+    // Check if the grid base overlaps; shift it if so
+    const gridBase = findNonOverlappingPosition(
+      { x: desiredBaseX, y: desiredBaseY },
+      "image",
+      nodes,
+    );
+    const baseX = gridBase.x;
+    const baseY = gridBase.y;
     const currentCounter = nodeCounter;
 
     const placeholderNodes: CanvasNode[] = [];
@@ -681,11 +731,14 @@ export function Canvas() {
     setEdges(eds => [...eds, ...newEdges]);
     setNodeCounter(c => c + 4);
 
-    // Build reference images for generateImage
+    // Build reference images for generateImage (product photos + thumbnail as style ref)
     const refImages = (dirData.referenceImageUrls || []).map(url => ({
       url,
       label: "product reference",
     }));
+    if (dirData.vibeImageUrl) {
+      refImages.push({ url: dirData.vibeImageUrl, label: "style reference" });
+    }
 
     // Fire 4 generateImage calls in parallel
     prompts.forEach((prompt, i) => {
@@ -716,14 +769,14 @@ export function Canvas() {
   }, [nodes, nodeCounter, setNodes, setEdges, generateImage, buildDirectionPrompts]);
 
   // Handle agent submission — non-blocking flow
-  const handleAgentSubmit = useCallback((imageUrls: string[], brief: string) => {
+  const handleAgentSubmit = useCallback((imageUrls: string[], brief: string, productAnalysis: import("./types").StructuredProductAnalysis, boldMode: boolean) => {
     setIsAgentOpen(false);
 
     const viewport = reactFlowInstanceRef.current?.getViewport();
     const centerX = viewport ? (-viewport.x + window.innerWidth / 2) / (viewport.zoom || 1) : 400;
     const centerY = viewport ? (-viewport.y + window.innerHeight / 2) / (viewport.zoom || 1) : 300;
     const count = 5;
-    const totalWidth = (count - 1) * 320;
+    const totalWidth = (count - 1) * 400;
     const startX = centerX - totalWidth / 2;
 
     // Create placeholder loading nodes
@@ -731,12 +784,11 @@ export function Canvas() {
     const placeholderNodes: CanvasNode[] = placeholderIds.map((id, i) => ({
       id,
       type: "creative-direction" as const,
-      position: { x: startX + i * 320, y: centerY },
+      position: { x: startX + i * 400, y: centerY },
       data: {
         title: "Loading...",
         brief: "Analyzing your product...",
         vibePrompt: "",
-        keywords: [],
         isLoading: true,
       },
     }));
@@ -746,7 +798,7 @@ export function Canvas() {
     setTimeout(() => reactFlowInstanceRef.current?.fitView({ duration: 500, padding: 0.2 }), 100);
 
     // Fire analysis (non-blocking)
-    analyzeProduct({ imageUrls, brief: brief || undefined })
+    analyzeProduct({ imageUrls, brief: brief || undefined, visualDescription: productAnalysis.visualDescription, boldMode: boldMode || undefined })
       .then((result) => {
         // Update nodes with real data + productDescription/referenceImageUrls
         setNodes(nds => nds.map(node => {
@@ -761,9 +813,8 @@ export function Canvas() {
               title: dir.title,
               brief: dir.brief,
               vibePrompt: dir.vibePrompt,
-              keywords: dir.keywords.slice(0, 5),
               isLoading: true,
-              productDescription: result.productDescription,
+              productDescription: productAnalysis.visualDescription,
               referenceImageUrls: imageUrls,
             },
           } as CanvasNode;
@@ -799,8 +850,7 @@ export function Canvas() {
             title: dir.title,
             brief: dir.brief,
             vibePrompt: dir.vibePrompt,
-            keywords: dir.keywords.slice(0, 5),
-            productDescription: result.productDescription,
+            productDescription: productAnalysis.visualDescription,
             referenceImageUrls: imageUrls,
           })
             .then(({ prompts }) => {
@@ -847,7 +897,7 @@ export function Canvas() {
     const centerX = viewport ? (-viewport.x + window.innerWidth / 2) / (viewport.zoom || 1) : 400;
     const centerY = viewport ? (-viewport.y + window.innerHeight / 2) / (viewport.zoom || 1) : 300;
     const count = selections.length;
-    const totalWidth = (count - 1) * 320;
+    const totalWidth = (count - 1) * 400;
     const startX = centerX - totalWidth / 2;
     const currentCounter = nodeCounter;
 
@@ -855,12 +905,11 @@ export function Canvas() {
     const placeholderNodes: CanvasNode[] = selections.map((sel, i) => ({
       id: `direction-${currentCounter + i}`,
       type: "creative-direction" as const,
-      position: { x: startX + i * 320, y: centerY },
+      position: { x: startX + i * 400, y: centerY },
       data: {
         title: "Adapting...",
         brief: "Adapting inspiration to your product...",
         vibePrompt: "",
-        keywords: [],
         isLoading: true,
         inspirationId: sel.inspiration.id,
         referenceImageUrls: imageUrls,
@@ -892,7 +941,6 @@ export function Canvas() {
                 title: result.title,
                 brief: result.brief,
                 vibePrompt: result.vibePrompt,
-                keywords: result.keywords.slice(0, 5),
                 isLoading: false,
                 vibeImageUrl: sel.inspiration.image,
                 productDescription: productAnalysis.visualDescription,
@@ -906,7 +954,6 @@ export function Canvas() {
             title: result.title,
             brief: result.brief,
             vibePrompt: result.vibePrompt,
-            keywords: result.keywords.slice(0, 5),
             productDescription: productAnalysis.visualDescription,
             referenceImageUrls: imageUrls,
           })
@@ -967,10 +1014,11 @@ export function Canvas() {
         const inputImg = new Image();
         inputImg.onload = () => {
           const inputNodeId = `image-${nodeCounter}`;
-          const inputPosition = {
-            x: 100 + nodeCounter * 50,
-            y: 100 + nodeCounter * 50,
-          };
+          const inputPosition = findNonOverlappingPosition(
+            { x: 100 + nodeCounter * 50, y: 100 + nodeCounter * 50 },
+            "image",
+            nodes,
+          );
 
           // Create node for the input composite (user's sketch/annotations)
           const inputNode: ImageNodeType = {
@@ -989,10 +1037,11 @@ export function Canvas() {
           const generatedImg = new Image();
           generatedImg.onload = () => {
             const generatedNodeId = `image-${nodeCounter + 1}`;
-            const generatedPosition = {
-              x: inputPosition.x + 300,
-              y: inputPosition.y + 50,
-            };
+            const generatedPosition = findNonOverlappingPosition(
+              { x: inputPosition.x + 300, y: inputPosition.y + 50 },
+              "image",
+              [...nodes, inputNode],
+            );
 
             // Create node for the generated image
             const generatedNode: ImageNodeType = {
@@ -1036,7 +1085,7 @@ export function Canvas() {
             : null;
 
           // Position new node to the right and slightly below the parent
-          const position = parentNode
+          const desired = parentNode
             ? {
                 x: parentNode.position.x + 300,
                 y: parentNode.position.y + 50,
@@ -1045,6 +1094,7 @@ export function Canvas() {
                 x: 100 + nodeCounter * 50,
                 y: 100 + nodeCounter * 50,
               };
+          const position = findNonOverlappingPosition(desired, "image", nodes);
 
           const newNodeId = `image-${nodeCounter}`;
 
@@ -1107,7 +1157,7 @@ export function Canvas() {
 
       {/* Main Canvas Area */}
       <div className="w-full h-full relative bg-white overflow-hidden">
-        {nodes.length === 0 ? (
+        {nodes.length === 0 && !isAgentOpen ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <p
               style={{

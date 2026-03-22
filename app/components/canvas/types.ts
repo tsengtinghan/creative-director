@@ -33,7 +33,6 @@ export type CreativeDirectionNodeData = {
   title: string;
   brief: string;
   vibePrompt: string;
-  keywords: string[];
   vibeImageUrl?: string;
   isLoading?: boolean;
   productDescription?: string;
@@ -41,7 +40,7 @@ export type CreativeDirectionNodeData = {
   generationPrompts?: string[];
   promptsReady?: boolean;
   isExpanded?: boolean;
-  autoEditBrief?: boolean;
+
   iterateFeedback?: string;
   isIterating?: boolean;
   inspirationId?: string;

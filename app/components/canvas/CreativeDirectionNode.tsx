@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useRef } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "framer-motion";
 import type { CreativeDirectionNode as CreativeDirectionNodeType } from "./types";
@@ -11,13 +11,16 @@ function CreativeDirectionNodeComponent({
   selected,
 }: NodeProps<CreativeDirectionNodeType>) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isEditingBrief, setIsEditingBrief] = useState(data.autoEditBrief === true);
   const [briefValue, setBriefValue] = useState(data.brief);
-  const [isAddingKeyword, setIsAddingKeyword] = useState(false);
-  const [newKeyword, setNewKeyword] = useState("");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(data.title);
   const [iterateInput, setIterateInput] = useState("");
   const briefRef = useRef<HTMLTextAreaElement>(null);
-  const keywordInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync local state when data changes from parent (e.g. API response)
+  useEffect(() => { setBriefValue(data.brief); }, [data.brief]);
+  useEffect(() => { setTitleValue(data.title); }, [data.title]);
+  const titleRef = useRef<HTMLInputElement>(null);
   const iterateInputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -50,25 +53,15 @@ function CreativeDirectionNodeComponent({
   };
 
   const handleBriefBlur = () => {
-    setIsEditingBrief(false);
     if (briefValue !== data.brief && data.onUpdateField) {
       data.onUpdateField(id, "brief", briefValue);
     }
   };
 
-  const handleRemoveKeyword = (index: number) => {
-    if (data.onUpdateField) {
-      const updated = data.keywords.filter((_, i) => i !== index);
-      data.onUpdateField(id, "keywords", updated);
-    }
-  };
-
-  const handleAddKeyword = () => {
-    const trimmed = newKeyword.trim();
-    if (trimmed && data.onUpdateField) {
-      data.onUpdateField(id, "keywords", [...data.keywords, trimmed]);
-      setNewKeyword("");
-      setIsAddingKeyword(false);
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false);
+    if (titleValue !== data.title && data.onUpdateField) {
+      data.onUpdateField(id, "title", titleValue);
     }
   };
 
@@ -77,6 +70,7 @@ function CreativeDirectionNodeComponent({
 
   const canExpand = data.promptsReady || (data.brief && data.vibePrompt && !data.isLoading);
   const showIterateInput = data.isIterating;
+  const isLoadingState = data.isLoading && data.title === "Loading...";
 
   return (
     <>
@@ -94,22 +88,22 @@ function CreativeDirectionNodeComponent({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
           className={`
-            relative overflow-hidden rounded-xl cursor-pointer
-            bg-white shadow-lg
-            ${selected ? "ring-2 ring-red-500 ring-offset-2 ring-offset-white" : "ring-1 ring-gray-200"}
+            relative overflow-hidden rounded-2xl cursor-pointer
+            bg-white
+            ${selected ? "ring-2 ring-red-500 ring-offset-2 ring-offset-white shadow-xl shadow-red-500/10" : "ring-1 ring-gray-200 shadow-lg"}
           `}
-          style={{ width: 256 }}
+          style={{ width: 340 }}
         >
-          {/* Vibe image area */}
+          {/* Vibe image area — larger */}
           <div
-            className="w-full flex items-center justify-center bg-gray-100 overflow-hidden"
-            style={{ height: 160 }}
+            className="w-full flex items-center justify-center bg-gray-50 overflow-hidden relative"
+            style={{ height: 200 }}
           >
             {data.isLoading && !data.vibeImageUrl ? (
               <motion.div
                 className="w-full h-full"
                 style={{
-                  background: "linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)",
+                  background: "linear-gradient(90deg, #f5f5f5 25%, #ebebeb 50%, #f5f5f5 75%)",
                   backgroundSize: "200% 100%",
                 }}
                 animate={{ backgroundPosition: ["200% 0", "-200% 0"] }}
@@ -123,26 +117,28 @@ function CreativeDirectionNodeComponent({
                 draggable={false}
               />
             ) : (
-              <svg
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#d1d5db"
-                strokeWidth="1.5"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="M21 15l-5-5L5 21" />
-              </svg>
+              <div className="flex flex-col items-center gap-2">
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#d1d5db"
+                  strokeWidth="1.5"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+              </div>
             )}
           </div>
 
-          {/* Content */}
-          <div className="p-3 relative" style={{ fontFamily }}>
-            {data.isLoading && data.title === "Loading..." && (
+          {/* Content area — more spacious */}
+          <div className="p-5 relative" style={{ fontFamily }}>
+            {isLoadingState && (
               <motion.div
-                className="absolute inset-0 z-10 rounded-b-xl"
+                className="absolute inset-0 z-10 rounded-b-2xl"
                 style={{
                   background: "linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.6) 50%, transparent 75%)",
                   backgroundSize: "200% 100%",
@@ -151,76 +147,59 @@ function CreativeDirectionNodeComponent({
                 transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
               />
             )}
-            {/* Title */}
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: data.isLoading && data.title === "Loading..." ? "#ccc" : "#111",
-                marginBottom: 8,
-              }}
-            >
-              {data.title}
-            </div>
 
-            {/* Keywords */}
-            <div className="flex flex-wrap gap-1 mb-2">
-              {data.keywords.map((keyword, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 group/pill"
-                  style={{ fontSize: 11 }}
-                >
-                  {keyword}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveKeyword(i);
-                    }}
-                    className="opacity-0 group-hover/pill:opacity-100 ml-0.5 text-gray-400 hover:text-red-500 transition-opacity"
-                    style={{ fontSize: 10, lineHeight: 1 }}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {isAddingKeyword ? (
-                <input
-                  ref={keywordInputRef}
-                  value={newKeyword}
-                  onChange={(e) => setNewKeyword(e.target.value)}
-                  onBlur={() => {
-                    if (newKeyword.trim()) handleAddKeyword();
-                    else setIsAddingKeyword(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddKeyword();
-                    if (e.key === "Escape") {
-                      setNewKeyword("");
-                      setIsAddingKeyword(false);
-                    }
-                  }}
-                  className="nodrag nowheel px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border-none outline-none focus:ring-1 focus:ring-red-300"
-                  style={{ fontSize: 11, width: 60 }}
-                  autoFocus
-                  placeholder="tag"
-                />
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsAddingKeyword(true);
-                  }}
-                  className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
-                  style={{ fontSize: 11 }}
-                >
-                  +
-                </button>
-              )}
-            </div>
+            {/* Title — editable on click */}
+            {isEditingTitle && !isLoadingState ? (
+              <input
+                ref={titleRef}
+                value={titleValue}
+                onChange={(e) => setTitleValue(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleTitleBlur();
+                  if (e.key === "Escape") {
+                    setTitleValue(data.title);
+                    setIsEditingTitle(false);
+                  }
+                }}
+                className="nodrag nowheel w-full border-b-2 border-red-300 bg-transparent outline-none text-gray-900 mb-3"
+                style={{
+                  fontSize: 17,
+                  fontWeight: 700,
+                  fontFamily,
+                  letterSpacing: "-0.01em",
+                }}
+                autoFocus
+              />
+            ) : (
+              <div
+                onClick={() => {
+                  if (!isLoadingState) {
+                    setIsEditingTitle(true);
+                    setTitleValue(data.title);
+                  }
+                }}
+                className={`mb-3 ${isLoadingState ? "" : "cursor-text hover:text-red-600"} transition-colors`}
+                style={{
+                  fontSize: 17,
+                  fontWeight: 700,
+                  color: isLoadingState ? "#ccc" : "#111",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {data.title}
+              </div>
+            )}
 
-            {/* Brief */}
-            {isEditingBrief ? (
+            {/* Brief — plain editable text */}
+            {isLoadingState ? (
+              <p
+                className="text-gray-300"
+                style={{ fontSize: 13, lineHeight: 1.6 }}
+              >
+                {data.brief}
+              </p>
+            ) : (
               <textarea
                 ref={briefRef}
                 value={briefValue}
@@ -229,32 +208,20 @@ function CreativeDirectionNodeComponent({
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setBriefValue(data.brief);
-                    setIsEditingBrief(false);
+                    briefRef.current?.blur();
                   }
                 }}
-                className="nodrag nowheel w-full resize-none border border-gray-200 rounded-md p-1 text-gray-500 outline-none focus:border-red-300"
-                style={{ fontSize: 12, lineHeight: 1.4, fontFamily }}
-                rows={3}
-                autoFocus
-              />
-            ) : (
-              <p
-                onClick={() => {
-                  setIsEditingBrief(true);
-                  setBriefValue(data.brief);
-                }}
-                className="text-gray-500 cursor-text hover:text-gray-700 transition-colors"
+                className="nodrag nowheel w-full resize-none border-none outline-none bg-transparent text-gray-500"
                 style={{
-                  fontSize: 12,
-                  lineHeight: 1.4,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  fontFamily,
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  scrollbarWidth: "none",
                 }}
-              >
-                {data.brief}
-              </p>
+                rows={7}
+              />
             )}
           </div>
 
@@ -262,7 +229,7 @@ function CreativeDirectionNodeComponent({
           {(isHovered || selected) && (
             <button
               onClick={handleDelete}
-              className="nodrag absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 hover:bg-red-500 flex items-center justify-center transition-colors"
+              className="nodrag absolute top-3 right-3 w-7 h-7 rounded-full bg-black/60 hover:bg-red-500 flex items-center justify-center transition-colors"
               aria-label="Delete direction"
             >
               <svg
@@ -283,47 +250,48 @@ function CreativeDirectionNodeComponent({
           )}
         </motion.div>
 
-        {/* Action buttons — always visible, outside the card to prevent selection conflicts */}
+        {/* Action button — centered below card */}
         {!data.isLoading && data.title !== "Loading..." && (
-          <div
-            className="nodrag nowheel flex gap-1.5 mt-2 w-full"
-            style={{ fontFamily }}
-          >
+          <div className="nodrag nowheel flex justify-center mt-3 w-full">
             {!data.isExpanded ? (
               <button
                 onClick={handleExpand}
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 disabled={!canExpand}
-                className="flex-1 py-2 rounded-lg transition-all"
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md hover:scale-110"
                 style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  backgroundColor: canExpand ? "#111" : "#e5e5e5",
-                  color: canExpand ? "#fff" : "#999",
+                  color: canExpand ? "#ef4444" : "#9ca3af",
                   cursor: canExpand ? "pointer" : "default",
+                  backgroundColor: "transparent",
                 }}
               >
-                {data.promptsReady ? "Expand" : canExpand ? "Generate" : "Building prompts..."}
+                {data.promptsReady || canExpand ? (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                ) : (
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300 border-t-gray-500 animate-spin" />
+                )}
               </button>
             ) : (
-              <>
-                <button
-                  onClick={handleIterate}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="flex-1 py-2 rounded-lg transition-all hover:bg-gray-800"
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    backgroundColor: "#111",
-                    color: "#fff",
-                    cursor: "pointer",
-                  }}
-                >
-                  Iterate
-                </button>
-              </>
+              <button
+                onClick={handleIterate}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                style={{
+                  border: "1px solid #e0e0e0",
+                  color: "#ef4444",
+                  cursor: "pointer",
+                  backgroundColor: "#fff",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 4v6h6" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+              </button>
             )}
           </div>
         )}
@@ -331,8 +299,8 @@ function CreativeDirectionNodeComponent({
         {/* Iterate input — shown on the iterated copy */}
         {showIterateInput && (
           <div
-            className="nodrag nowheel mt-2 w-full"
-            style={{ fontFamily, width: 256 }}
+            className="nodrag nowheel mt-3 w-full"
+            style={{ fontFamily, width: 340 }}
           >
             <textarea
               ref={iterateInputRef}
@@ -347,10 +315,10 @@ function CreativeDirectionNodeComponent({
                   setIterateInput("");
                 }
               }}
-              placeholder="What would you like to change? e.g. &quot;more water and stream imagery&quot;"
-              className="w-full resize-none border border-gray-200 rounded-lg p-3 text-gray-700 outline-none focus:border-red-400 focus:ring-1 focus:ring-red-200 bg-white shadow-sm"
+              placeholder='What would you like to change? e.g. "warmer tones", "more minimal", "outdoor setting"'
+              className="w-full resize-none border border-gray-200 rounded-xl p-4 text-gray-700 outline-none focus:border-red-400 focus:ring-1 focus:ring-red-200 bg-white shadow-sm"
               style={{ fontSize: 13, lineHeight: 1.5, fontFamily }}
-              rows={2}
+              rows={3}
               autoFocus
             />
             <button
@@ -361,10 +329,10 @@ function CreativeDirectionNodeComponent({
               onMouseDown={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               disabled={!iterateInput.trim()}
-              className="w-full mt-1.5 py-2 rounded-lg text-white font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full mt-2 py-3 rounded-xl text-white font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-red-500/20"
               style={{
                 backgroundColor: "#FF0000",
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 600,
                 fontFamily,
               }}
