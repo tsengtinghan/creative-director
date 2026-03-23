@@ -89,16 +89,43 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How it works + Landing video */}
+      {/* Landing video */}
+      <section className="px-8 pb-[80px]">
+        <div className="max-w-[860px] mx-auto flex justify-center">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            className="w-[320px]"
+          >
+            <div
+              className="rounded-[32px] overflow-hidden"
+              style={{
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.08)",
+              }}
+            >
+              <video
+                src="/mmstudiolandingvid.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full block"
+              />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* How it works */}
       <section className="px-8 pb-[120px]">
-        <div className="max-w-[860px] mx-auto flex flex-col md:flex-row gap-12 md:gap-16 items-center">
-          {/* Steps — left */}
+        <div className="max-w-[860px] mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.8, ease }}
-            className="flex-1 flex flex-col justify-between self-stretch py-2"
+            className="grid grid-cols-1 md:grid-cols-3 gap-10"
           >
             <Step
               number="01"
@@ -115,31 +142,6 @@ export default function LandingPage() {
               title="Iterate and branch"
               description="Refine with natural language. Branch into variations. Compare side-by-side. Every iteration lives on the canvas."
             />
-          </motion.div>
-
-          {/* Landing video — right, height matched to steps */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.8, delay: 0.1, ease }}
-            className="hidden md:block self-stretch flex-shrink-0"
-          >
-            <div
-              className="rounded-[16px] overflow-hidden h-full"
-              style={{
-                boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06)",
-              }}
-            >
-              <video
-                src="/mmstudiolandingvid.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="h-full w-auto object-cover block"
-              />
-            </div>
           </motion.div>
         </div>
       </section>
