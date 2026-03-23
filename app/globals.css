@@ -186,10 +186,9 @@
   border: 1px dashed rgba(0, 0, 0, 0.3);
 }
 
-/* Hide scrollbars for full canvas experience */
+/* Reset base spacing */
 html,
 body {
-  overflow: hidden;
   margin: 0;
   padding: 0;
 }
