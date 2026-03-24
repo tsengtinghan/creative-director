@@ -89,28 +89,26 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Landing video */}
+      {/* Demo video */}
       <section className="px-8 pb-[80px]">
-        <div className="max-w-[860px] mx-auto flex justify-center">
+        <div className="max-w-[860px] mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
-            className="w-[320px]"
+            transition={{ duration: 0.8, ease }}
+            className="rounded-[16px] overflow-hidden"
+            style={{
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.08)",
+            }}
           >
-            <div
-              className="rounded-[32px] overflow-hidden"
-              style={{
-                boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.08)",
-              }}
-            >
-              <video
-                src="/mmstudiolandingvid.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full block"
+            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+              <iframe
+                src="https://www.youtube.com/embed/kHkEGDdY1nc?rel=0"
+                title="mmstudio demo"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full border-0"
               />
             </div>
           </motion.div>
@@ -146,51 +144,28 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Demo video + CTA */}
+      {/* Landing video */}
       <section className="px-8 pb-[120px]">
-        <div className="max-w-[640px] mx-auto">
-          <motion.a
-            href="https://youtu.be/kHkEGDdY1nc"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="max-w-[640px] mx-auto flex justify-center">
+          <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.8, ease }}
-            className="block relative w-full rounded-[16px] overflow-hidden cursor-pointer group"
+            className="w-[320px] rounded-[32px] overflow-hidden"
             style={{
               boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.08)",
-              backgroundColor: "#111",
             }}
           >
-            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-              <img
-                src="https://img.youtube.com/vi/kHkEGDdY1nc/maxresdefault.jpg"
-                alt="mmstudio demo"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors duration-200">
-                <div
-                  className="w-[56px] h-[56px] rounded-full flex items-center justify-center backdrop-blur-sm transition-transform duration-200 group-hover:scale-105"
-                  style={{ backgroundColor: "rgba(255,255,255,0.95)" }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M8 5.14v13.72a1 1 0 001.5.86l11.14-6.86a1 1 0 000-1.72L9.5 4.28a1 1 0 00-1.5.86z" fill="#1a1a1a" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </motion.a>
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-4 text-center text-[13px]"
-            style={{ color: "#bbb" }}
-          >
-            Watch the full demo
-          </motion.p>
+            <video
+              src="/mmstudiolandingvid.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full block"
+            />
+          </motion.div>
         </div>
       </section>
 
